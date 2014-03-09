@@ -14,6 +14,7 @@ import unicodedata
 
 
 file_folder = 'detailed_pages/'
+table_name = 'properties'
 sleep_time = 10
 
 #get list of files in target directory
@@ -29,6 +30,10 @@ def strip_accents(s):
    no_accents_unicode = ''.join(c for c in unicodedata.normalize('NFD', s) if unicodedata.category(c) != 'Mn')
    return unicodedata.normalize('NFKD', no_accents_unicode).encode('ascii','ignore')
 
+def normalize_float(s):
+    s = s.replace(".","")
+    s = s.replace(",",".")
+    return s
 
 
 # -----------------------------------------------------------------------------
@@ -48,18 +53,21 @@ def parsePage(file_path):
     main_info_block_header = main_info_block.find(attrs={'class':'ficha_dadosprincipais_titulo'})
     
     type_block = main_info_block_header.find(attrs={'class':'ficha_texto18', 'class':'ficha_titulo'})
-    deal_type = type_block.contents[0]
-    property_type = type_block.contents[-1].contents[-1].split()[-1]
+    type_block_text_parts = type_block.get_text().split('|')
+    deal_type = type_block_text_parts[0].strip()
+    if len(type_block_text_parts) > 1:
+        property_type = type_block_text_parts[1].strip()
+    else:
+        property_type = ""
 
     price_block = main_info_block_header.find(attrs={'class':'ficha_texto16'})
-    price = price_block.contents[0].contents[0] # in format "R$ xxx.xxx,xx"
+    price = price_block.get_text() # in format "R$ xxx.xxx,xx"
     price = price.split()[-1] # remove R$
     if price == "Consulte":
-        price = int(0)
+        price = '0'
     else:
         price = price.replace(".","") #remove . separators
         price = price.split(',')[0] #remove decimal part, if any
-        price = int(price)
     
     #get all sub-blocks of info form main info block
     list_of_info_blocks = []
@@ -103,9 +111,9 @@ def parsePage(file_path):
     #get blocks of complementary info: Areas, Observation, and Extra Infos
     list_of_complementary_info_blocks = main_info_block.find_all(attrs={'class':'ficha_detalhes'})
     
-    area_total = float(0)
-    area_usable = float(0)
-    area_land = float(0)
+    area_total = '0'
+    area_usable = '0'
+    area_land = '0'
     observations = ""    
     
     for compl_info_block in list_of_complementary_info_blocks:
@@ -117,49 +125,101 @@ def parsePage(file_path):
             observations = re.sub(r'[\s\t\n]+',r' ',compl_info_block.get_text())
         #areas
         elif compl_block_title_no_accents == "Areas":
-            area_total = 0
-            areas_split = re.sub(r'[\s\t\n]+',r' ',compl_info_block.get_text()).split()
+            base_text = compl_info_block.get_text()
+            base_text = base_text.replace(" de ", " ")
+            base_text = base_text.replace(" da ", " ")
+            base_text = base_text.replace(" do ", " ")
+            base_text = base_text.replace(":", ": ")
+            areas_split = re.sub(r'[\s\t\n]+',r' ',base_text).split()
             for idx in range(len(areas_split)/4):
                 area_type = strip_accents(areas_split[4*idx + 1])
-                area_value = float(areas_split[4*idx + 2].replace(",","."))
+                area_value = normalize_float(areas_split[4*idx + 2])
                 if area_type == "util:":
                     area_usable = area_value
                 elif area_type == "total:":
                     area_total = area_value
                 elif area_type == "terreno:":
                     area_land = area_value
+        #dimensions
+        elif compl_block_title_no_accents == "Dimensoes":
+            width = 0
+            length = 0
+            base_text = compl_info_block.get_text()
+            base_text = base_text.replace(":", ": ")
+            base_text = base_text.replace("Comprimento", " Comprimento")
+            base_text = base_text.replace("Largura", " Largura")
+            dimensions_split = re.sub(r'[\s\t\n]+',r' ',base_text).split()
+            for idx in range(len(dimensions_split)/3):
+                dimension_type = strip_accents(dimensions_split[3*idx + 0])
+                dimension_value = dimensions_split[3*idx + 1].replace(",",".")
+                if "Largura" in dimension_type:
+                    width = float(dimension_value)
+                elif "Comprimento" in dimension_type:
+                    length = float(dimension_value)
+            computed_area = width*length
+            #print str(width) + "*" + str(length) + "=" + str(computed_area)
+            if float(area_total) <= 0:
+                area_total = str(computed_area)
+            if float(area_land) <= 0:
+                area_land = str(computed_area)
         #extra info
         else:
             current_extra_info_text = re.sub(r'[\s\t\n]+',r' ',compl_info_block.get_text())
             extra_info = extra_info + current_extra_info_text + "  |  "
     
     
-
-    #print price#_block.prettify()
+    #try to find area in text if not specfied
+    if float(area_total)==0 and float(area_usable)==0 and float(area_land)==0:
+        search_regex = r'([\.0-9,]+[ ]*[mM][²2])'
+        search_result = re.search(search_regex,observations)
+        if search_result:
+            detected_area_text = search_result.group(1)
+            detected_area_text = re.split(r'[mM]',detected_area_text)[0]
+            area_total = normalize_float(detected_area_text)
+            print "detected area: " + area_total
+        else:
+            search_result = re.search(search_regex,extra_info)
+            if search_result:
+                detected_area_text = search_result.group(1)
+                detected_area_text = re.split(r'[mM]',detected_area_text)[0]
+                area_total = normalize_float(detected_area_text)
+                print "detected area: " + area_total
     
-    
-    
-    
+    columns = []
     values = []
     
+    columns.append("deal_type")
     values.append(deal_type)
+    columns.append("property_type")
     values.append(property_type)
+    columns.append("price")
     values.append(price)
     
+    columns.append("address_detail_type")
     values.append(address_detail_type)
+    columns.append("address_detail")
     values.append(address_detail)
+    columns.append("address")
     values.append(address)
+    columns.append("neighborhood")
     values.append(neighborhood)
+    columns.append("city")
     values.append(city)
+    columns.append("state")
     values.append(state)
     
+    columns.append("area_total")
     values.append(area_total)
+    columns.append("area_usable")
     values.append(area_usable)
+    columns.append("area_land")
     values.append(area_land)
+    columns.append("observations")
     values.append(observations)
+    columns.append("extra_info")
     values.append(extra_info)
     
-    return values
+    return [columns,values]
     
     
     
@@ -191,22 +251,40 @@ try:
         split_date = re.split("[-]",last_update)
         last_update = "-".join(reversed(split_date))
         
-        
-        # TEST ---------------------------------------------
-        print "ref: " + ref_num        
-        values = parsePage(file_folder+file_name)
-        print values
-        break
-        
-
-        # --------------------------------------------------        
-        
-        
-        
         #check if file has already been uploaded to db
         cur.execute("SELECT * FROM properties WHERE ref_num = '" + ref_num + "' AND last_update = '" + last_update + "'")
         if cur.fetchone() <> None:
             continue
+        
+        
+        # TEST ---------------------------------------------
+        print "ref: " + ref_num
+        columns_and_values = parsePage(file_folder+file_name)
+        columns = columns_and_values[0]        
+        values = columns_and_values[1]
+        
+        columns.insert(0,"last_update")
+        values.insert(0,last_update)
+        columns.insert(0,"ref_num")
+        values.insert(0,ref_num)
+        
+        columns = ['`'+s+'`' for s in columns ]
+        values = ['"'+s.replace("\"","")+'"' for s in values ]
+        query = "INSERT INTO `" + table_name + "` (" + ",".join(columns) + ") VALUES(" +  ",".join(values) + ")"
+
+        
+        try:
+           cur.execute(query)
+           con.commit()
+        except:
+           con.rollback()        
+        
+        #print query
+        #break
+        
+        # --------------------------------------------------          
+        
+        
         
         #parsePage(file_folder+file_name)        
         
