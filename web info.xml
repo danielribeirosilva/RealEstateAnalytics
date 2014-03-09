@@ -1,0 +1,7 @@
+Fatal error: Uncaught exception 'Exception' with message 'Unknown column 'atualizacao' in 'order clause'<br />SQL:SELECT imoveis.ref, imoveis.codigocliente, imoveis.negocio, imoveis.tipo, imoveis.valor_divulgar_site, imoveis.valor, imoveis.rua, imoveis.areautil, imoveis.areatotal, imoveis.areaterreno, imoveis.metragem, imoveis.situacao, imoveis.google, imoveis.temp_capacidade_pessoas, imoveis.temp_vista_pro_mar, imoveis.temp_distancia_do_mar, imoveis.qtd_quartos dorm, imoveis.qtd_suites suite, imoveis.qtd_suites+qtd_quartos AS dormsuite, imoveis.qtdefotos, imoveis.largura, imoveis.comprimento, imoveis.garcoberta, imoveis.gardescoberta, imoveis.distanciacidade, imoveis.link_video, imoveis.link_tour360, edificio.edificio as nomeedificio, edificio.tipo as tipoedificio, cidades.nome as cidade, cidades.estado, bairros.nome as bairro, clientes.nome imobiliaria, clientes.ultimaatualizacao, clientes.divulgarendereco, clientes.divulgaredificio, clientes.fone, clientes.fone_locacao, clientes.fone_venda FROM imoveis_cni as i in /home/httpd/vhosts/centralnegocios.com.br/httpdocs/sistema/class/conexoes.php on line 56
+
+http://www.centralnegocios.com.br/imoveis/venda/terrenos/10-maringa-pr/ordem-bairros.nome/limite-543
+
+
+
+curl http://www.centralnegocios.com.br/imoveis/venda/terrenos/10-maringa-pr/ordem-bairros.nome/limite-543 > html_todos_terrenos.txt
