@@ -256,23 +256,22 @@ try:
         if cur.fetchone() <> None:
             continue
         
-        
-        # TEST ---------------------------------------------
+        #parse page and get info
         print "ref: " + ref_num
         columns_and_values = parsePage(file_folder+file_name)
         columns = columns_and_values[0]        
         values = columns_and_values[1]
         
+        #add ref_num and last_update to info
         columns.insert(0,"last_update")
         values.insert(0,last_update)
         columns.insert(0,"ref_num")
         values.insert(0,ref_num)
         
+        #insert info in database
         columns = ['`'+s+'`' for s in columns ]
         values = ['"'+s.replace("\"","")+'"' for s in values ]
         query = "INSERT INTO `" + table_name + "` (" + ",".join(columns) + ") VALUES(" +  ",".join(values) + ")"
-
-        
         try:
            cur.execute(query)
            con.commit()
@@ -281,19 +280,7 @@ try:
         
         #print query
         #break
-        
-        # --------------------------------------------------          
-        
-        
-        
-        #parsePage(file_folder+file_name)        
-        
-        
-        #cur.execute("SELECT * FROM properties WHERE ref_num = 'asd123' AND last_update = '2014-03-09'")
-        #ver = cur.fetchone()    
-        #print ver
-        
-        #break
+
     
 except MySQLdb.Error, e:
   
