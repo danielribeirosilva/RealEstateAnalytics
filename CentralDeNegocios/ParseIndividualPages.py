@@ -11,11 +11,11 @@ import sys
 import MySQLdb
 import re
 import unicodedata
+import aux
 
-date_extracted = '2014-03-07'
-file_folder = 'detailed_pages/'
+date_extracted = '2014-03-13'
+file_folder = 'detailed_pages/'+date_extracted+"/"
 table_name = 'properties'
-sleep_time = 10
 
 #get list of files in target directory
 files_list = os.listdir(file_folder)
@@ -35,6 +35,11 @@ def normalize_float(s):
     s = s.replace(",",".")
     return s
 
+def getPageTitle(file_path):
+    f = open(file_path, 'r')
+    html = f.read();
+    soup = BeautifulSoup(html, "html.parser")
+    return soup.title.get_text()
 
 # -----------------------------------------------------------------------------
 # FUNCTION THAT PARSES ONE PAGE 
@@ -256,6 +261,16 @@ try:
         if cur.fetchone() <> None:
             continue
         
+        #check if page is empty (was sold in between)
+        page_title = getPageTitle(file_folder+file_name)
+        if "foi encontrado nenhum" in page_title:
+            print "REMOVING...\n"
+            #update db with sold properties
+            aux.updateDbWithSoldProperties([ref_num],date_extracted)
+            #update db with active lists of properties (remove it from actives)
+            aux.updateDbWithActiveProperties([],[ref_num])
+            continue
+        
         #parse page and get info
         print "ref: " + ref_num
         columns_and_values = parsePage(file_folder+file_name)
@@ -269,7 +284,7 @@ try:
         values.insert(0,ref_num)
         #add extraction date
         columns.append('date_extracted')
-        values.append('date_extracted')
+        values.append(date_extracted)
         
         #insert info in database
         columns = ['`'+s+'`' for s in columns ]
