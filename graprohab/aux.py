@@ -7,6 +7,7 @@ Created on Fri May 16 15:58:34 2014
 
 import MySQLdb
 import sys
+import re
 
 def connectToDatabase(h, u, p, d_b, u_s):
     try:
@@ -39,20 +40,74 @@ def entryExists(date, order_number):
     finally:
         con.close()
 
-def insertEntry(entry):
+def organExists(entry_id, organ):
+    con = connectToDefaultDatabase()
+    cur = con.cursor()
+    try:
+        query = "SELECT * FROM organs WHERE entry_id='" + str(entry_id) + "' AND organ_name='" + organ + "'"
+        cur.execute(query)
+        row = cur.fetchone()
+        if row == None:
+            return False
+        return True
+    except MySQLdb.Error, e:
+       print "Error %d: %s" % (e.args[0],e.args[1])
+    finally:
+        con.close()
+
+def insertEntry(entry, meeting_date):
     con = connectToDefaultDatabase()
     cur = con.cursor()
     columns=[]
     values=[]
     for key in entry.keys():
-        columns.append(key)
-        values.append(entry[key])
+        if u'Org\xe3os' in key: #this field will be inserted in another table
+            continue
+        columns.append(getColumnName(key))
+        values.append("'"+adjustFormat(entry[key])+"'")
+    columns.append('meeting_date')
+    values.append("'"+meeting_date+"'")
     query = "INSERT INTO `entries` (" + ",".join(columns) + ") VALUES(" +  ",".join(values) + ")"
+    print '---------\n'+query
     try:
        cur.execute(query)
        con.commit()
     except:
        con.rollback()  
+
+def adjustFormat(word):
+    return re.sub("'"," ",word) #remove simple quotes
+       
+def getEntryId(entry, meeting_date):
+    con = connectToDefaultDatabase()
+    cur = con.cursor()
+        
+    try:
+        query = "SELECT id FROM entries WHERE order_number = '" + entry[u'N\xba de ordem'] + "' AND meeting_date = '" + meeting_date + "'"
+        print "--------------\n" + query
+        cur = con.cursor(MySQLdb.cursors.DictCursor)
+        cur.execute(query)
+    
+        row = cur.fetchone()
+        return row["id"]
+        
+    except MySQLdb.Error, e:
+       print "Error %d: %s" % (e.args[0],e.args[1])
+    con.close()
+    
+       
+def insertOrgans(entry_id,organ_list):
+    con = connectToDefaultDatabase()
+    cur = con.cursor()
+    for organ in organ_list:
+        if organExists(entry_id, organ):
+            continue
+        query = "INSERT INTO `organs` (entry_id, organ_name) VALUES('" + str(entry_id) + "','" + organ + "')"
+        try:
+           cur.execute(query)
+           con.commit()
+        except:
+           con.rollback()
        
 def getColumnName(key):
     return{
